@@ -4,60 +4,48 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 import numpy as np
 
-st.set_page_config(page_title="Loan Prediction EDA", layout="wide")
+# ================= PAGE CONFIG =================
+st.set_page_config(
+    page_title="Loan Prediction EDA",
+    page_icon="💰",
+    layout="wide"
+)
 
-st.title("📊 Loan Prediction Dataset - EDA")
+st.markdown(
+    "<h1 style='text-align:center;'>💰 Loan Prediction - Exploratory Data Analysis</h1>",
+    unsafe_allow_html=True
+)
 
-# Load data
-df = pd.read_csv("../DataSets/LP_Train.csv")
+# ================= LOAD DATA =================
+@st.cache_data
+def load_data():
+    df = pd.read_csv("../DataSets/LP_Train.csv")
+    return df
 
-st.subheader("Raw Dataset")
-st.dataframe(df)
+df = load_data()
 
-# Missing values
-st.subheader("Missing Values")
-st.write(df.isnull().sum())
+# ================= SIDEBAR =================
+st.sidebar.header("📌 Navigation")
+section = st.sidebar.radio(
+    "Go to",
+    ["Dataset Overview", "Data Cleaning", "EDA Visualizations", "Insights"]
+)
 
-# Data cleaning
-df.Gender = df.Gender.fillna('Male')
-df.Married = df.Married.fillna('Yes')
-df.Dependents = df.Dependents.fillna(0)
-df.Self_Employed = df.Self_Employed.fillna('No')
-df.LoanAmount = df.LoanAmount.fillna(128.0)
-df.Loan_Amount_Term = df.Loan_Amount_Term.fillna(360.0)
-df.Credit_History = df.Credit_History.fillna(1.0)
+# ================= DATA CLEANING FUNCTION =================
+def clean_data(df):
+    df.Gender.fillna('Male', inplace=True)
+    df.Married.fillna('Yes', inplace=True)
+    df.Dependents.fillna(0, inplace=True)
+    df.Self_Employed.fillna('No', inplace=True)
+    df.LoanAmount.fillna(128.0, inplace=True)
+    df.Loan_Amount_Term.fillna(360.0, inplace=True)
+    df.Credit_History.fillna(1.0, inplace=True)
+    df.Dependents = df.Dependents.replace('[+]', '', regex=True).astype(int)
+    return df
 
-df.Dependents = df.Dependents.replace('[+]', '', regex=True).astype('int64')
+df = clean_data(df)
 
-# Describe
-st.subheader("Statistical Summary")
-st.write(df[['ApplicantIncome','CoapplicantIncome','LoanAmount',
-             'Loan_Amount_Term','Credit_History']].describe())
-
-# Categorical value counts
-st.subheader("Categorical Feature Distribution")
-cat_cols = ['Gender','Married','Dependents','Education','Self_Employed','Property_Area']
-for col in cat_cols:
-    st.write(f"**{col}**")
-    st.write(df[col].value_counts())
-
-# Bar plots (Loan Status vs categorical)
-st.subheader("Loan Status vs Categorical Features")
-cols = ['Gender','Married','Dependents','Education','Self_Employed']
-
-for col in cols:
-    fig, ax = plt.subplots()
-    pd.crosstab(df[col], df['Loan_Status']).plot(kind='bar', ax=ax)
-    plt.title(col)
-    st.pyplot(fig)
-
-# Boxplot Applicant Income
-st.subheader("Applicant Income vs Loan Status")
-fig, ax = plt.subplots()
-sb.boxplot(x=df.Loan_Status, y=df.ApplicantIncome, ax=ax)
-st.pyplot(fig)
-
-# Outlier removal function
+# ================= OUTLIER REMOVAL =================
 def remove_outliers(df, col):
     q1 = np.percentile(df[col], 25)
     q3 = np.percentile(df[col], 75)
@@ -66,56 +54,105 @@ def remove_outliers(df, col):
     upper = q3 + 1.5 * iqr
     return df[(df[col] >= lower) & (df[col] <= upper)]
 
-df = remove_outliers(df, 'ApplicantIncome')
-df = remove_outliers(df, 'CoapplicantIncome')
-df = remove_outliers(df, 'LoanAmount')
-df = remove_outliers(df, 'Loan_Amount_Term')
+for col in ['ApplicantIncome','CoapplicantIncome','LoanAmount','Loan_Amount_Term']:
+    df = remove_outliers(df, col)
 
-# Coapplicant Income
-st.subheader("Coapplicant Income vs Loan Status")
-fig, ax = plt.subplots()
-sb.boxplot(x=df.Loan_Status, y=df.CoapplicantIncome, ax=ax)
-st.pyplot(fig)
+# ================= DATASET OVERVIEW =================
+if section == "Dataset Overview":
+    st.subheader("📄 Dataset Preview")
+    st.dataframe(df.head())
 
-# Correlation
-st.subheader("Correlation Matrix")
-st.write(df[['ApplicantIncome','CoapplicantIncome','LoanAmount']].corr())
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total Rows", df.shape[0])
+    with col2:
+        st.metric("Total Columns", df.shape[1])
 
-# Loan Amount vs Gender
-st.subheader("Loan Amount vs Gender")
-fig, ax = plt.subplots()
-sb.boxplot(x=df.Gender, y=df.LoanAmount, ax=ax)
-st.pyplot(fig)
+    st.subheader("📌 Data Types")
+    st.write(df.dtypes)
 
-# Loan Amount vs Married
-st.subheader("Loan Amount vs Married")
-fig, ax = plt.subplots()
-sb.boxplot(x=df.Married, y=df.LoanAmount, ax=ax)
-st.pyplot(fig)
+    st.subheader("❗ Missing Values")
+    st.write(df.isnull().sum())
 
-# Loan Amount vs Education
-st.subheader("Loan Amount vs Education")
-fig, ax = plt.subplots()
-sb.boxplot(x=df.Education, y=df.LoanAmount, ax=ax)
-st.pyplot(fig)
+# ================= DATA CLEANING =================
+elif section == "Data Cleaning":
+    st.subheader("🧹 Cleaning Summary")
+    st.success("✔ Missing values handled\n✔ Dependents cleaned\n✔ Outliers removed")
 
-# Loan Amount Term vs Loan Status
-st.subheader("Loan Amount Term vs Loan Status")
-fig, ax = plt.subplots()
-sb.barplot(x=df.Loan_Status, y=df.Loan_Amount_Term, ax=ax)
-st.pyplot(fig)
+    st.subheader("📊 Statistical Summary")
+    st.write(
+        df[['ApplicantIncome','CoapplicantIncome','LoanAmount',
+            'Loan_Amount_Term','Credit_History']].describe()
+    )
 
-# Scatter Plot
-st.subheader("Loan Amount Term vs Credit History")
-fig, ax = plt.subplots()
-sb.scatterplot(x=df.Loan_Amount_Term, y=df.Credit_History, ax=ax)
-st.pyplot(fig)
+# ================= EDA VISUALIZATIONS =================
+elif section == "EDA Visualizations":
 
-# Property Area vs Loan Status
-st.subheader("Property Area vs Loan Status")
-fig, ax = plt.subplots()
-pd.crosstab(df['Property_Area'], df['Loan_Status']).plot(kind='bar', ax=ax)
-plt.xticks(rotation=0)
-st.pyplot(fig)
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Categorical Analysis", "Income Analysis", "Loan Analysis", "Property Area"]
+    )
 
-st.success("EDA Completed Successfully ✅")
+    # -------- TAB 1 --------
+    with tab1:
+        st.subheader("Loan Status vs Categorical Features")
+        cols = ['Gender','Married','Education','Self_Employed']
+
+        for col in cols:
+            fig, ax = plt.subplots()
+            pd.crosstab(df[col], df['Loan_Status']).plot(kind='bar', ax=ax)
+            ax.set_title(col)
+            st.pyplot(fig)
+
+    # -------- TAB 2 --------
+    with tab2:
+        st.subheader("Income Distribution")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig, ax = plt.subplots()
+            sb.boxplot(x=df.Loan_Status, y=df.ApplicantIncome, ax=ax)
+            ax.set_title("Applicant Income vs Loan Status")
+            st.pyplot(fig)
+
+        with col2:
+            fig, ax = plt.subplots()
+            sb.boxplot(x=df.Loan_Status, y=df.CoapplicantIncome, ax=ax)
+            ax.set_title("Coapplicant Income vs Loan Status")
+            st.pyplot(fig)
+
+    # -------- TAB 3 --------
+    with tab3:
+        st.subheader("Loan Amount Analysis")
+
+        fig, ax = plt.subplots()
+        sb.boxplot(x=df.Education, y=df.LoanAmount, ax=ax)
+        ax.set_title("Loan Amount vs Education")
+        st.pyplot(fig)
+
+        fig, ax = plt.subplots()
+        sb.barplot(x=df.Loan_Status, y=df.Loan_Amount_Term, ax=ax)
+        ax.set_title("Loan Term vs Loan Status")
+        st.pyplot(fig)
+
+    # -------- TAB 4 --------
+    with tab4:
+        st.subheader("Property Area Impact")
+
+        fig, ax = plt.subplots()
+        pd.crosstab(df.Property_Area, df.Loan_Status).plot(kind='bar', ax=ax)
+        ax.set_title("Property Area vs Loan Status")
+        plt.xticks(rotation=0)
+        st.pyplot(fig)
+
+# ================= INSIGHTS =================
+else:
+    st.subheader("📌 Key Insights")
+    st.markdown("""
+    ✔ Applicants with **Credit History = 1** have higher approval rate  
+    ✔ **Graduate applicants** tend to get higher loan amounts  
+    ✔ **Urban & Semiurban** areas show more loan approvals  
+    ✔ Higher applicant income increases approval probability  
+    """)
+
+    st.balloons()
