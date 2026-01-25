@@ -19,7 +19,7 @@ st.markdown(
 # ================= LOAD DATA =================
 @st.cache_data
 def load_data():
-    df = pd.read_csv("../DataSets/LP_Train.csv")
+    df = pd.read_csv("LP_Train.csv")
     return df
 
 df = load_data()
