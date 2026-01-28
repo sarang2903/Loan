@@ -1,150 +1,149 @@
 import streamlit as st
 import pandas as pd
-import seaborn as sb
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-# =========================
-# Page Config
-# =========================
 st.set_page_config(page_title="Loan Prediction EDA", layout="wide")
+
 st.title("📊 Loan Prediction Dataset - EDA")
 
-# =========================
+# ======================
 # Load Data
-# =========================
+# ======================
 @st.cache_data
 def load_data():
-    return pd.read_csv("LP_Train.csv")
+    df = pd.read_csv("LP_Train.csv")
+    return df
 
 df = load_data()
 
 st.subheader("Raw Dataset")
 st.dataframe(df)
 
-# =========================
-# Missing Values
-# =========================
+# ======================
+# Data Cleaning
+# ======================
 st.subheader("Missing Values")
 st.write(df.isnull().sum())
 
-# =========================
-# Data Cleaning
-# =========================
-df['Gender'] = df['Gender'].fillna(df['Gender'].mode()[0])
-df['Married'] = df['Married'].fillna(df['Married'].mode()[0])
-df['Self_Employed'] = df['Self_Employed'].fillna(df['Self_Employed'].mode()[0])
+df['Gender'] = df['Gender'].fillna('Male')
+df['Married'] = df['Married'].fillna('Yes')
+df['Dependents'] = df['Dependents'].fillna(0)
+df['Self_Employed'] = df['Self_Employed'].fillna('No')
+df['LoanAmount'] = df['LoanAmount'].fillna(113.73)
+df['Loan_Amount_Term'] = df['Loan_Amount_Term'].fillna(344.53)
+df['Credit_History'] = df['Credit_History'].fillna(1.0)
 
-df['LoanAmount'] = df['LoanAmount'].fillna(df['LoanAmount'].median())
-df['Loan_Amount_Term'] = df['Loan_Amount_Term'].fillna(df['Loan_Amount_Term'].mode()[0])
-df['Credit_History'] = df['Credit_History'].fillna(df['Credit_History'].mode()[0])
+df['Dependents'] = df['Dependents'].replace('[+]','', regex=True).astype('int64')
 
-# Dependents
-df['Dependents'] = df['Dependents'].fillna('0')
-df['Dependents'] = df['Dependents'].str.replace('+', '', regex=False).astype(int)
+st.success("Missing values handled successfully!")
 
-# =========================
-# Outlier Removal
-# =========================
-def remove_outliers(data, col):
-    q1 = data[col].quantile(0.25)
-    q3 = data[col].quantile(0.75)
-    iqr = q3 - q1
-    return data[(data[col] >= q1 - 1.5 * iqr) & (data[col] <= q3 + 1.5 * iqr)]
+# ======================
+# Descriptive Statistics
+# ======================
+st.subheader("Numerical Feature Summary")
+st.write(df[['ApplicantIncome','CoapplicantIncome',
+             'LoanAmount','Loan_Amount_Term','Credit_History']].describe())
 
-for col in ['ApplicantIncome', 'CoapplicantIncome', 'LoanAmount', 'Loan_Amount_Term']:
-    df = remove_outliers(df, col)
-
-# =========================
-# Statistical Summary
-# =========================
-st.subheader("Statistical Summary")
-st.write(df.describe())
-
-# =========================
-# Categorical Distributions
-# =========================
+# ======================
+# Categorical Value Counts
+# ======================
 st.subheader("Categorical Feature Distribution")
-cat_cols = ['Gender', 'Married', 'Dependents', 'Education',
-            'Self_Employed', 'Property_Area']
+cat_cols = ['Gender','Married','Dependents','Education','Self_Employed','Property_Area']
 
 for col in cat_cols:
-    st.write(f"**{col}**")
+    st.write(f"### {col}")
     st.write(df[col].value_counts())
 
-# =========================
-# Loan Status vs Categorical
-# =========================
+# ======================
+# Crosstab Plots
+# ======================
 st.subheader("Loan Status vs Categorical Features")
 
-for col in ['Gender', 'Married', 'Dependents', 'Education', 'Self_Employed']:
+cols = ['Gender','Married','Dependents','Education','Self_Employed']
+for col in cols:
     fig, ax = plt.subplots()
     pd.crosstab(df[col], df['Loan_Status']).plot(kind='bar', ax=ax)
-    ax.set_title(col)
+    plt.title(f"{col} vs Loan Status")
     st.pyplot(fig)
-    plt.close(fig)
 
-# =========================
-# Income Analysis
-# =========================
+# ======================
+# Boxplot - Applicant Income
+# ======================
 st.subheader("Applicant Income vs Loan Status")
 fig, ax = plt.subplots()
-sb.boxplot(data=df, x='Loan_Status', y='ApplicantIncome', ax=ax)
+sns.boxplot(x=df['Loan_Status'], y=df['ApplicantIncome'], ax=ax)
 st.pyplot(fig)
-plt.close(fig)
 
+# ======================
+# Outlier Removal (ApplicantIncome)
+# ======================
+i = 'ApplicantIncome'
+q1 = np.percentile(df[i], 25)
+q3 = np.percentile(df[i], 75)
+iqr = q3 - q1
+
+c1 = q1 - 1.5 * iqr
+c2 = q3 + 1.5 * iqr
+
+outliers = df[(df[i] < c1) | (df[i] > c2)].index
+df = df.drop(outliers)
+
+st.info(f"Outliers removed from {i}: {len(outliers)} rows")
+
+# ======================
+# Barplot - Coapplicant Income
+# ======================
 st.subheader("Coapplicant Income vs Loan Status")
 fig, ax = plt.subplots()
-sb.boxplot(data=df, x='Loan_Status', y='CoapplicantIncome', ax=ax)
+sns.barplot(x=df['Loan_Status'], y=df['CoapplicantIncome'], ax=ax)
 st.pyplot(fig)
-plt.close(fig)
 
-# =========================
-# Correlation Matrix
-# =========================
+# ======================
+# Correlation
+# ======================
 st.subheader("Correlation Matrix")
-num_cols = df.select_dtypes(include=np.number)
-fig, ax = plt.subplots(figsize=(8, 6))
-sb.heatmap(num_cols.corr(), annot=True, cmap='coolwarm', ax=ax)
-st.pyplot(fig)
-plt.close(fig)
+st.write(df[['ApplicantIncome','CoapplicantIncome','LoanAmount']].corr())
 
-# =========================
-# Loan Amount Comparisons
-# =========================
-for col in ['Gender', 'Married', 'Education']:
-    st.subheader(f"Loan Amount vs {col}")
-    fig, ax = plt.subplots()
-    sb.boxplot(data=df, x=col, y='LoanAmount', ax=ax)
-    st.pyplot(fig)
-    plt.close(fig)
+# ======================
+# GroupBy Analysis
+# ======================
+st.subheader("Loan Amount by Gender, Marital Status & Education")
+st.write(df.groupby(['Gender','Married','Education'])['LoanAmount'].sum())
 
-# =========================
-# Loan Term vs Loan Status
-# =========================
-st.subheader("Loan Amount Term vs Loan Status")
-fig, ax = plt.subplots()
-sb.barplot(data=df, x='Loan_Status', y='Loan_Amount_Term', ax=ax)
-st.pyplot(fig)
-plt.close(fig)
-
-# =========================
+# ======================
 # Credit History vs Loan Status
-# =========================
+# ======================
 st.subheader("Credit History vs Loan Status")
 fig, ax = plt.subplots()
-pd.crosstab(df['Credit_History'], df['Loan_Status']).plot(kind='bar', ax=ax)
+pd.crosstab(df['Loan_Status'], df['Credit_History']).plot(kind='bar', ax=ax)
+plt.xticks(rotation=0)
 st.pyplot(fig)
-plt.close(fig)
 
-# =========================
-# Property Area vs Loan Status
-# =========================
+# ======================
+# Loan Amount Term Analysis
+# ======================
+st.subheader("Loan Amount Term Analysis")
+
+fig, ax = plt.subplots()
+sns.barplot(x=df['Loan_Status'], y=df['Loan_Amount_Term'], ax=ax)
+st.pyplot(fig)
+
+fig, ax = plt.subplots()
+sns.lineplot(x=df['Loan_Amount_Term'], y=df['Credit_History'], ax=ax)
+st.pyplot(fig)
+
+# ======================
+# Property Area Analysis
+# ======================
 st.subheader("Property Area vs Loan Status")
 fig, ax = plt.subplots()
 pd.crosstab(df['Property_Area'], df['Loan_Status']).plot(kind='bar', ax=ax)
-ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
+plt.xticks(rotation=0)
 st.pyplot(fig)
-plt.close(fig)
 
-st.success("EDA Completed Successfully ✅")
+st.subheader("Loan Amount & Term by Property Area")
+st.write(df.groupby('Property_Area')[['LoanAmount','Loan_Amount_Term']].sum())
+
+st.success("EDA Completed 🎉")
